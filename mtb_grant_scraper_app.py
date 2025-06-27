@@ -2,56 +2,51 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
 
-# Page config
-st.set_page_config(page_title="MTB Club Grant Finder", layout="wide")
+st.set_page_config(page_title="🚵 MTB Club Grant Finder")
 st.title("🚵 MTB Club Grant Finder")
 
-st.markdown("""
-This tool automatically scrapes public grant websites and displays relevant opportunities for your Mountain Bike Club.
-""")
+# Real-time scraper for ClubGrants
+def scrape_clubgrants():
+    url = "https://www.clubgrants.com.au/find-your-local-grant"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, "html.parser")
 
-# Dummy scraper function
-def scrape_dummy_grants():
-    return [
-        {
-            "Title": "Community Sport Infrastructure Grant",
-            "URL": "https://example.com/grant1",
-            "Source": "SportAus",
-            "Tags": "cycling, youth",
-            "Deadline": "2025-09-30",
-            "Description": "Funding for local clubs upgrading sports facilities."
-        },
-        {
-            "Title": "Active Clubs Kickstart Program",
-            "URL": "https://example.com/grant2",
-            "Source": "QLD Gov",
-            "Tags": "equipment, training",
-            "Deadline": "2025-10-15",
-            "Description": "Support for sports equipment and coaching costs."
-        }
-    ]
+    grants = []
 
-# Load and display grants
-grants = scrape_dummy_grants()
+    for row in soup.select(".find-your-local-grant__listing-item"):
+        title = row.select_one(".find-your-local-grant__title").get_text(strip=True)
+        summary = row.select_one(".find-your-local-grant__description").get_text(strip=True)
+        region = row.select_one(".find-your-local-grant__location").get_text(strip=True)
+        link = "https://www.clubgrants.com.au" + row.select_one("a")["href"]
+
+        grants.append({
+            "Title": title,
+            "Description": summary,
+            "Region": region,
+            "URL": link,
+            "Tags": "community, club"
+        })
+
+    return grants
+
+# Load data
+grants = scrape_clubgrants()
 df = pd.DataFrame(grants)
 
-search_term = st.text_input("🔍 Search by keyword (e.g. 'cycling', 'equipment')")
+# UI
+search = st.text_input("🔍 Search by keyword (e.g. cycling, region, equipment)")
 
-if search_term:
-    df = df[df.apply(lambda row: search_term.lower() in row.astype(str).str.lower().to_string(), axis=1)]
+if search:
+    df = df[df.apply(lambda row: search.lower() in row.astype(str).str.lower().to_string(), axis=1)]
 
-st.dataframe(df[["Title", "Source", "Tags", "Deadline"]])
+st.dataframe(df[["Title", "Region", "Tags"]])
 
 for _, row in df.iterrows():
     with st.expander(row["Title"]):
-        st.markdown(f"**Deadline**: {row['Deadline']}")
-        st.markdown(f"**Source**: {row['Source']}")
-        st.markdown(f"**Tags**: {row['Tags']}")
-        st.markdown(f"**[Apply Here]({row['URL']})**")
-        st.markdown(f"{row['Description']}")
+        st.markdown(f"**Region:** {row['Region']}")
+        st.markdown(f"**[View Grant Details]({row['URL']})**")
+        st.write(row['Description'])
 
-# Footer
 st.markdown("---")
-st.caption("Built for MTB clubs to find relevant grants with ease.")
+st.caption("Data sourced live from ClubGrants.com.au")
